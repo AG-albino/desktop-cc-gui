@@ -56,7 +56,6 @@ pub(super) fn resolve_model(
             .get(&format!("ANTHROPIC_DEFAULT_{}_MODEL", raw.to_uppercase()))
             .map(String::as_str)
             .unwrap_or(raw),
-        _ => raw,
     };
     Some(if wants_1m && !resolved.ends_with("[1m]") {
         format!("{resolved}[1m]")
