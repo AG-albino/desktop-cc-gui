@@ -38,17 +38,19 @@ pub(super) async fn codebuddy_catalog(bin: &str) -> EngineCatalog {
     }
 }
 
-fn codebuddy_config_dir() -> PathBuf {
+fn codebuddy_config_dir() -> Option<PathBuf> {
     if let Some(dir) = std::env::var_os("CODEBUDDY_CONFIG_DIR") {
         if !dir.is_empty() {
-            return PathBuf::from(dir);
+            return Some(PathBuf::from(dir));
         }
     }
-    dirs::home_dir().expect("no home directory").join(".codebuddy")
+    // No home dir (some containers/service accounts): degrade to "no
+    // configured default model" instead of panicking inside an IPC command.
+    dirs::home_dir().map(|home| home.join(".codebuddy"))
 }
 
 fn read_configured_default_model() -> Option<String> {
-    let dir = codebuddy_config_dir();
+    let dir = codebuddy_config_dir()?;
     for name in ["settings.local.json", "settings.json"] {
         if let Ok(content) = std::fs::read_to_string(dir.join(name)) {
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(&content) {

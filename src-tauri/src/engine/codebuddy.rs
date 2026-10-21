@@ -14,6 +14,26 @@ pub struct CodeBuddyAccountStatus {
     pub enterprise_name: Option<String>,
 }
 
+fn status_from_account(account: &serde_json::Value) -> CodeBuddyAccountStatus {
+    let uid = account.get("uid").and_then(|v| v.as_str()).map(str::to_string);
+    let display_name = account
+        .get("displayName")
+        .or_else(|| account.get("enterpriseUserName"))
+        .or_else(|| account.get("nickname"))
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+    let enterprise_name = account
+        .get("enterpriseName")
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+    CodeBuddyAccountStatus {
+        logged_in: true,
+        uid,
+        display_name,
+        enterprise_name,
+    }
+}
+
 pub fn check_codebuddy_account_status() -> CodeBuddyAccountStatus {
     let mut candidates = Vec::new();
 
@@ -55,26 +75,44 @@ pub fn check_codebuddy_account_status() -> CodeBuddyAccountStatus {
             if let Ok(content) = std::fs::read_to_string(&path) {
                 if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
                     if let Some(account) = val.get("account") {
-                        let uid = account.get("uid").and_then(|v| v.as_str()).map(str::to_string);
-                        let display_name = account
-                            .get("displayName")
-                            .or_else(|| account.get("enterpriseUserName"))
-                            .or_else(|| account.get("nickname"))
-                            .and_then(|v| v.as_str())
-                            .map(str::to_string);
-                        let enterprise_name = account
-                            .get("enterpriseName")
-                            .and_then(|v| v.as_str())
-                            .map(str::to_string);
-                        return CodeBuddyAccountStatus {
-                            logged_in: true,
-                            uid,
-                            display_name,
-                            enterprise_name,
-                        };
+                        return status_from_account(account);
                     }
                 }
             }
+        }
+    }
+
+    // CLI credential store: `codebuddy /login` in a terminal writes under the
+    // CLI's own config dir, not into the IDE extension directory above, so
+    // probing only the extension file would keep showing "not logged in"
+    // after a successful CLI login. Probe the credential filenames used by
+    // Claude-Code-compatible CLIs.
+    let cli_home = super::engine_home(Some("CODEBUDDY_CONFIG_DIR"), ".codebuddy");
+    for name in [".credentials.json", "credentials.json", "auth.json"] {
+        let path = cli_home.join(name);
+        if !path.is_file() {
+            continue;
+        }
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) else {
+            continue;
+        };
+        if let Some(account) = val.get("account") {
+            return status_from_account(account);
+        }
+        let has_token = ["accessToken", "access_token", "idToken", "id_token", "token"]
+            .iter()
+            .any(|key| match val.get(*key).and_then(|v| v.as_str()) {
+                Some(token) => !token.is_empty(),
+                None => false,
+            });
+        if has_token {
+            return CodeBuddyAccountStatus {
+                logged_in: true,
+                ..Default::default()
+            };
         }
     }
 
@@ -129,12 +167,37 @@ impl Engine for CodeBuddyEngine {
         cmd.arg("--include-partial-messages");
 
         let mut preapproved: Vec<&str> = Vec::new();
+
+        // MCP servers first: their pre-approved tool names must land in the
+        // SAME --allowedTools emission as everything else — if the CLI treats
+        // a repeated flag as last-wins, a second emission would clobber the
+        // user's tool whitelist.
+        let mut mcp_servers = serde_json::Map::new();
+        if req.computer_use == Some(true) {
+            let spec = crate::computer_use::computer_use_spec()?;
+            mcp_servers.insert(spec.name.clone(), crate::computer_use::mcp_server_json(&spec));
+            preapproved.push("mcp__ccgui-computer");
+        }
+        if let Some(bot_id) = req.memory_bot.as_deref() {
+            let spec = crate::memory::mcp::bound_spec(bot_id)?;
+            mcp_servers.insert(spec.name.clone(), crate::computer_use::mcp_server_json(&spec));
+            preapproved.push("mcp__ccgui-memory");
+        }
+        if !mcp_servers.is_empty() {
+            let config = serde_json::json!({ "mcpServers": mcp_servers });
+            cmd.arg("--mcp-config");
+            cmd.arg(config.to_string());
+        }
+
         if let Some(tools) = req.allowed_tools.as_deref() {
             cmd.arg("--permission-mode");
             cmd.arg("plan");
             cmd.arg("--allowedTools");
             for tool in tools {
                 cmd.arg(tool);
+            }
+            for tool in &preapproved {
+                cmd.arg(*tool);
             }
             cmd.arg("--disallowedTools");
             for tool in ["Bash", "Edit", "Write", "NotebookEdit", "Task"] {
@@ -159,29 +222,11 @@ impl Engine for CodeBuddyEngine {
                     }
                 }
             }
-        }
-
-        let mut mcp_servers = serde_json::Map::new();
-        if req.computer_use == Some(true) {
-            let spec = crate::computer_use::computer_use_spec()?;
-            mcp_servers.insert(spec.name.clone(), crate::computer_use::mcp_server_json(&spec));
-            preapproved.push("mcp__ccgui-computer");
-        }
-        if let Some(bot_id) = req.memory_bot.as_deref() {
-            let spec = crate::memory::mcp::bound_spec(bot_id)?;
-            mcp_servers.insert(spec.name.clone(), crate::computer_use::mcp_server_json(&spec));
-            preapproved.push("mcp__ccgui-memory");
-        }
-        if !mcp_servers.is_empty() {
-            let config = serde_json::json!({ "mcpServers": mcp_servers });
-            cmd.arg("--mcp-config");
-            cmd.arg(config.to_string());
-        }
-
-        if !preapproved.is_empty() {
-            cmd.arg("--allowedTools");
-            for tool in preapproved {
-                cmd.arg(tool);
+            if !preapproved.is_empty() {
+                cmd.arg("--allowedTools");
+                for tool in preapproved {
+                    cmd.arg(tool);
+                }
             }
         }
 
@@ -197,6 +242,10 @@ impl Engine for CodeBuddyEngine {
             let trimmed = effort.trim();
             if !trimmed.is_empty() {
                 cmd.arg("--effort");
+                // The UI's top level is "ultra"; the CLI names it "max".
+                // Other levels (low/medium/high/xhigh/max) pass through as-is:
+                // an unsupported value fails loudly in the CLI's own error
+                // output rather than being silently remapped to a wrong tier.
                 cmd.arg(match trimmed {
                     "ultra" => "max",
                     other => other,
