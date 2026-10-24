@@ -298,7 +298,7 @@ export function WorkspaceSection({
           <button
             type="button"
             aria-label={t("chat.addWorkspace")}
-            title={t("chat.addWorkspace")}
+            title={t("chat.addWorkspaceHint")}
             onClick={onAddWorkspace}
             className="flex size-7 cursor-pointer items-center justify-center rounded-full text-foreground-icon-secondary transition-colors duration-150 hover:bg-background-tertiary-hover/55 hover:text-foreground-icon-primary"
           >

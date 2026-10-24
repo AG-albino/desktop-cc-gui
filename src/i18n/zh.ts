@@ -114,6 +114,7 @@ export const zh = {
     searchScopeTitle: "标题",
     searchScopeContent: "内容",
     addWorkspace: "添加工作区",
+    addWorkspaceHint: "添加工作区（可一次多选多个文件夹）",
     removeWorkspace: "移除工作区",
     newGroup: "新建分组",
     inputPlaceholder: "输入消息，Enter 发送，Shift+Enter 换行，或 @引用、#智能体",

@@ -118,6 +118,7 @@ export const en: Messages = {
     searchScopeTitle: "Title",
     searchScopeContent: "Content",
     addWorkspace: "Add workspace",
+    addWorkspaceHint: "Add workspace (you can select several folders at once)",
     removeWorkspace: "Remove workspace",
     newGroup: "New group",
     inputPlaceholder: "Type a message. Enter to send, Shift+Enter for newline, or @ to reference, # for agents",

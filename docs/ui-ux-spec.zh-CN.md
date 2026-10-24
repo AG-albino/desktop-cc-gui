@@ -84,6 +84,7 @@
 - disabled 必须改变光标语义（`disabled:cursor-not-allowed` 或 `disabled:cursor-default`）并降低强调（`opacity-50`~`60` 或语义 disabled token），不能只是点不动。
 - **「前置条件未满足」的禁用必须说清缺什么，并用可 hover 的禁用态承载**：这类禁用不能只变灰——用户会先输入再发现点不动。文案要指出缺的前提与下一步（发送键 tooltip：无会话时「先在侧栏新建一个会话，才能发送消息」；输入框占位提示用输入框口吻的那句「…再在这里输入」，别让默认的「Enter 发送」继续骗人；空态：零工作区时说「还没有工作区，请先在侧栏添加」并给操作指引），且**禁用态用 `aria-disabled` + 点击守卫而不是原生 `disabled`**——原生禁用收不到 hover / focus，解释性 tooltip 永远读不到（同 §3「阈值控件按会话保存」条与 `agent-limits-card` 的自动开关）。**禁用态的解释文案必须与它的可操作性一致**：别复用「点击前往设置」这类挂在真会跳转按钮上的句子（`chat.noEngineEnabled` 属于 `ChatConversation` 那颗真会 navigate 的按钮），被守卫拦住的控件用了它就成了空头承诺——无 CLI 时用 `chat.sendBlockedNoEngine`。空态文案按真实前提分流：零工作区与「有工作区但没会话」是两种缺法，不合并成一句话。回归：`ai-chat-composer.test.tsx`、`ChatConversation.test.tsx`、`use-chat-sidebar.test.tsx`。
 - **「新建会话」在零工作区时必须把会话开出来**：用户点的是新会话，登记目录只是它的前置步骤，不能止步于目录选择器（否则输入框仍不可用，用户会以为没生效）。做法与 worktree 创建完成后的「注册 → 接着开会话」一致；用户取消选择则不产生任何标签页。回归：`use-chat-sidebar.test.tsx`。
+- **「添加工作区」一次可选多个文件夹，逐个登记、部分失败不吞**：侧栏工作区标题行的 ＋ 打开多选目录对话框（`platform.ts` 的 `pickDirectories` → `dialog.open({ directory: true, multiple: true })`），选中的 N 个目录逐个 `add_workspace`（后端按路径 upsert，重复选中只更新时间戳），全部走完后**只重读一次** `list_workspaces`——逐次重读会让侧栏一条条闪出来。单个目录失败（权限 / 不是目录）不阻断其余目录，失败原因按行汇总进 `actionError`（`ErrorBanner` 是 `whitespace-pre-wrap`）；返回的是真正登记成功的路径列表，零工作区的「新建会话」据此取首个成功目录接着开会话（同前一条的链路），全部失败才什么都不开。按钮 tooltip 要写明可多选（`chat.addWorkspaceHint`），`aria-label` 仍是「添加工作区」，别把多选说明塞进无障碍名字里。取消对话框 = 空列表，不产生任何标签页。回归：`use-chat-sidebar.test.tsx`。
 - **无归属草稿随第一个会话落地，输入框提示随状态改口**：还没有任何标签页时输入框仍可编辑，字落在无归属草稿键（`sessionKey` 在 `active === null` 时返回的空串，`UNBOUND_DRAFT_KEY`）；那个会话一建立，草稿就搬到该会话的键上并删掉空键，**只搬一次**（否则会泄漏到之后新建的另一个工作区）。目标键已有草稿时**不覆盖**它，且这份无归属草稿**留在空键上不丢弃**，等下一个「还没有草稿的会话」接手——宁可晚一步，也不静默丢掉用户已经敲下的字。以上与「待发 → 真实 id」「引擎切换」两处既有的草稿迁移同一条规矩。同一状态下占位提示也要改口：发送被前置条件挡住时说明缺什么，不再显示会骗人的「Enter 发送」。回归：`use-chat-sidebar.test.tsx`。
 - **异步动作进行中不可重入**：进行中禁用按钮（或首行拦截 `if (running) return`），避免重复请求。
 - **反馈不改变布局**：图标在默认态与反馈态之间切换时，外层容器尺寸固定（`ActionFeedbackIcon` 用 `iconClassName` 同时约束容器和图标），按钮不能因为换图标而抖动。
@@ -297,6 +298,7 @@ const feedback = useRunningFeedback(store.loading);
 
 | 版本 | 时间 | 内容 |
 |---|---|---|
+| v0.87 | 2026-10-21 | 「添加工作区」支持一次勾选多个文件夹：`pickDirectories` 走多选目录对话框，新增 `store.addWorkspaces` 逐个登记后只重读一次列表，单个目录失败不阻断其余（失败原因按行汇总进 `actionError`），返回成功路径列表供零工作区的「新建会话」接着开首个会话；按钮 tooltip 改挂 `chat.addWorkspaceHint` 说明可多选（`aria-label` 不变）；§3 补规则 |
 | v0.86 | 2026-10-21 | Claude 后台任务（`run_in_background`）不再丢失完成后的续答：第一轮结算后输入框即恢复，CLI 自启的第二轮经 `turn_resumed` 重新打开该 run 并接在后面显示；等待期间发新消息，若模型 / effort / 权限模式未变，会直接写进仍存活的旧进程（后台任务不被停止），设置已变更或旧进程不可写时回退 `--resume` 新进程，其「停止旧后台任务」产生的空结果不再被当成本轮结束；驻留登记只对聊天事件汇生效，插件与任务工作台轮次维持原行为；§3 新增对应规则 |
 | v0.85 | 2026-10-21 | 状态栏分支列表新增搜索过滤（复用 `git.searchBranches` 占位与 `git.noMatchingBranches` 空态，打开即聚焦、关闭清空过滤条件）与整行原生 `title` 全名提示；搜索框是弹层第一个元素、与滚动列表平级；焦点随打开进入弹层，Esc 从此可关闭该弹层；另修原生 `title` 气泡被 react-aria 弹层（默认 z-index 100000）盖住的问题——气泡与弹层重叠时提示完全不可见；§2.3、§3 更新 |
 | v0.84 | 2026-10-16 | 字体设置新增独立「自定义字体族」分类（仅占位示例），保留上传分类；统一聊天代码、编辑器、差异视图和终端的代码字体/字号，补齐字体加载后量度与 PTY 尺寸同步；§2、§3 更新 |
