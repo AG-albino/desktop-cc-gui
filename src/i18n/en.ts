@@ -818,7 +818,7 @@ export const en: Messages = {
     sendShortcutCmdEnterCtrl: "Ctrl+Enter",
     thinkingAutoCollapse: "Fold thinking when it finishes",
     thinkingAutoCollapseDesc:
-      "Turn off to keep the thinking process expanded after thinking settles (no layout jump); click the header to fold it manually",
+      "Turn off to keep the thinking process expanded during the turn; click the header to fold it manually",
     promptHistory: "History completion",
     promptHistoryDesc:
       "Tab accepts a history suggestion while typing; ↑↓ recall history when the input is empty",
