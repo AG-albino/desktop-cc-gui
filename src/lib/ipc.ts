@@ -945,6 +945,13 @@ export interface RepositorySummary {
   untracked: number;
 }
 
+/** GitHub account behind a workspace's `origin` remote; non-github.com and
+ *  non-git workspaces are omitted. */
+export interface WorkspaceOwner {
+  path: string;
+  login: string;
+}
+
 /** Per-entry git state for one loaded tree level. `repository` marks an
  *  exact repo-root directory (blue name); plain folders never carry color. */
 export type FileTreeColor = "modified" | "untracked" | "repository";
@@ -1754,6 +1761,9 @@ export const ipc = {
   gitStatus: (path: string) => invoke<GitStatus>("git_status", { path }),
   gitRepositorySummaries: (paths: string[]) =>
     invoke<RepositorySummary[]>("git_repository_summaries", { paths }),
+  /** Owner avatars for sidebar rows (GitHub `origin` remote → login). */
+  gitWorkspaceOwners: (paths: string[]) =>
+    invoke<WorkspaceOwner[]>("git_workspace_owners", { paths }),
   gitFileColors: (path: string, files: string[]) =>
     invoke<Record<string, FileTreeColor>>("git_file_colors", { path, files }),
   gitTreeStatus: (levels: GitTreeLevel[]) =>

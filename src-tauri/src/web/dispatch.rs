@@ -1151,6 +1151,10 @@ pub(super) async fn dispatch(
             let a: PathsArgs = parse_args(&raw)?;
             ser(Ok(crate::git::git_repository_summaries(a.paths).await))
         }
+        "git_workspace_owners" => {
+            let a: PathsArgs = parse_args(&raw)?;
+            ser(Ok(crate::git::git_workspace_owners(a.paths).await))
+        }
         "git_file_colors" => {
             let a: GitFilesArgs = parse_args(&raw)?;
             ser(crate::git::git_file_colors(a.path, a.files).await)
