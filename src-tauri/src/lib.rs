@@ -451,6 +451,7 @@ pub fn run() {
             engine::list_plan_reviews,
             engine::list_engines,
             engine::models::list_engine_models,
+            engine::codebuddy::codebuddy_account_status,
             engine::pi_family_auth::pi_family_auth_list,
             engine::pi_family_auth::pi_family_auth_set_api_key,
             engine::pi_family_auth::pi_family_auth_delete_credential,
@@ -573,6 +574,7 @@ pub fn run() {
             open_app::get_program_icon,
             open_app::reveal_in_file_manager,
             // terminal
+            terminal::terminal_host_info,
             terminal::terminal_open,
             terminal::terminal_write,
             terminal::terminal_resize,

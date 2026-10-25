@@ -34,6 +34,7 @@
 ## 2. 设计基础
 
 - **Pi / OMP 订阅登出**：设置页仅在 OAuth 状态为已授权时显示登出入口。OMP 的「登出」经确认后在新终端执行对应供应商命令；Pi 的「前往登出」经确认后打开 CLI 的 `/logout` 选择器，不替用户选账号。终端命令发出不等于登出成功；授权状态以重新读取 CLI 凭据为准。实现：`PiFamilyOauthSection.tsx`、`PiFamilyAuthSection.tsx`、`piFamilyLogin.ts`。
+- **CodeBuddy 终端登录只报真实已交付**：设置 → CLI 管理 → CodeBuddy 的「终端登录」要求当前有活动工作区，不回退到侧栏首个工作区；每次只创建一个专用终端页签。启动命令与 `/login` 两次写入都需成功，且后者只在 CLI readiness 输出到达后发送；等待有界，PTY 消失、超时或写入失败都关闭本次新建的页签并在设置页显示失败，不把命令未交付当作成功。账号状态的「检测中」与 IPC「状态检测失败」分开；登录页签建立后即使设置页因导航卸载，下一次重新挂载的首次探测也绕过 30s 缓存。自定义 CLI 路径按原生宿主平台及实际终端 shell 转义，Web 访问端不得按浏览器系统猜测。实现：`codebuddyLogin.ts`、`terminalLogin.ts`、`CodeBuddyAuthSection.tsx`。
 
 - **字体高级设置**：设置 → 通用 → 外观的「高级」区域默认收起，展开/收起复用 `Collapsible`（200ms）。提供 px 数值输入「界面字号 / 内容字体大小 / 代码字体大小」（10–32px，整数，默认 16 / 14 / 13px），以及「界面字重」（标准 / 稍粗 / 加粗，默认标准）。数值在失焦或 Enter 时应用并保存；空值、越界与非整数恢复当前值。「重置为默认设置」一次恢复这四项，不重置字体文件、主题或界面缩放。界面字号按比例调整文字与行高，保留层级，不改变图标或布局间距；内容字号独立作用于聊天正文，代码字体与字号统一作用于聊天行内代码、代码块、编辑器、差异视图和内置终端。字重在原值上增加 0 / 100 / 200（最高 900），代码区域不跟随界面加粗。`uiFontSize` / `contentFontSize` / `codeFontSize` / `uiFontWeight` 持久化到 AppSettings，localStorage 镜像在首帧前应用；保存失败恢复原设置并提示错误。搜索这些设置自动展开「高级」。实现：`interface-typography.ts`、`typography.css`、`GeneralSection.tsx`。
 
@@ -287,6 +288,7 @@ const feedback = useRunningFeedback(store.loading);
 | Git 任务管理「刷新」 | `ccgui-plugin/git-tasks/main.js` | `useRunningFeedback` 等价实现（0.6s 转圈 → 900ms 对号，失败复位） | 独立 ESM 插件（`exec:gh` / `exec:git`），不导入宿主 hook；重读当前预设下的议题 / PR 与预设计数。缺省不接入新的宿主依赖 |
 | Git 任务管理「重新读取工作区与仓库」 | 同上 | **不加反馈** | 弹层内的菜单项，点击即关闭入口（同「重新加载」成功后按钮消失一类）；加载态由选择器自身的分组转圈与计数表达。重读 `ctx.workspaces.list` + git remote 解析 + `gh repo list` |
 | 接力引擎列表 | `ccgui-plugin/ccgui-plugin-plan-execute-relay/main.js` | 异步动作期间禁用，失败行内告警 | 独立 ESM 插件的文本动作；不导入宿主私有反馈 hook。刷新仅重读可用引擎、渠道名和模型，不触发模型请求 |
+| CodeBuddy 账号状态刷新 | `src/features/settings/CodeBuddyAuthSection.tsx` | 按钮 disabled 态 | 重新检测本地 CodeBuddy 登录状态（macOS Keychain / Windows 凭据管理器 / Linux keyring 只读存在性检查；探测基于推测的服务名，命中为「已登录」，未命中如实显示「状态未知」而非「未登录」；后端 30s 缓存） |
 
 注：Worktree **创建进度行不登记**在本清单——它不是「重新读取」入口，而是一次性任务的状态表达（进行中 → 成功/失败），用 §5 的进度语言（`Loader2` + 阶段文案），不存在「再刷一次」的语义；其失败行的「重试」是重新执行创建动作，同样不是刷新。
 
@@ -304,6 +306,8 @@ const feedback = useRunningFeedback(store.loading);
 
 | 版本 | 时间 | 内容 |
 |---|---|---|
+| v0.91 | 2026-10-25 | 收紧 CodeBuddy 登录反馈：无活动会话时不再回退首个工作区，空终端坞只创建一个登录 shell；两次终端写入与 CLI ready 等待均有明确成败，失败不假报成功，账号状态 IPC 失败与检测中分态，跨导航保留一次强制状态探测。宿主 shell 信息经 IPC 提供，远程 Web 与 Windows Git Bash 使用正确的命令转义；§2 补规则 |
+| v0.90 | 2026-10-25 | 新增 CodeBuddy CLI（命令 `codebuddy`）引擎：聊天引擎下拉与设置 CLI 管理按既有数据驱动形态自动出现；支持账号登录（终端唤起 `/login` 扫码/SSO 认证，登录状态经系统凭据存储做只读存在性检查，探测带 1.5s 超时、显式「刷新状态」绕过 30s 缓存）与 API Key 渠道登录；历史会话索引 `~/.codebuddy/projects`（按转录内的 cwd/sessionId 归属，目录名是 CLI 私有编码；一次扫描建索引、同 id 取最新副本、删除时清掉全部副本）；MCP 页接入原生 JSON 来源（`~/.codebuddy/mcp.json`、项目 `.codebuddy/mcp.json` / `.mcp.json`，写语义未对拍故只读） |
 | v0.89 | 2026-10-25 | 过程组在思考 settle / 工具调用边界保持展开，只在回答文字出现在其后或本轮结束时自动收起（设置项关闭则保持展开），修复流式对话中过程提前消失、再展开的跳动；用户手动的展开 / 收起仍优先。§4 补规则 |
 | v0.88 | 2026-10-25 | 侧栏工作区行显示仓库的 GitHub 身份图：`git_workspace_owners` 从工作区 `origin` 远端解析 github.com 账号，行首文件夹图标被该账号头像（20px）替换；非 GitHub / 无远端 / 非 git 仓库保持文件夹图标，加载与失败都回落到它。头像按路径缓存、一次提交合并成一次 IPC，失败不缓存；工作区分组收起时行头保持挂载（`SidebarDisclosure keepMounted`，收起后行仍 `inert`、线程列表照常卸载），展开不重建头像 `<img>`、不闪回文件夹图标；分组展开/收起补上 §2.4 的高度动画。头像 URL 构造抽到 `src/lib/github-avatar.ts`（插件市场开发者头像同源）。§2.4、§3 补规则 |
 | v0.87 | 2026-10-21 | 「添加工作区」支持一次勾选多个文件夹：`pickDirectories` 走多选目录对话框，新增 `store.addWorkspaces` 逐个登记后只重读一次列表，单个目录失败不阻断其余（失败原因按行汇总进 `actionError`），返回成功路径列表供零工作区的「新建会话」接着开首个会话；按钮 tooltip 改挂 `chat.addWorkspaceHint` 说明可多选（`aria-label` 不变）；§3 补规则 |

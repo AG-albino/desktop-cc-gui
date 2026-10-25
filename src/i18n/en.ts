@@ -995,6 +995,7 @@ export const en: Messages = {
       qoder: "Qoder CLI",
       "qoder-cn": "Qoder CLI (CN)",
       minimax: "MiniMax",
+      codebuddy: "CodeBuddy CLI",
     },
     cliManage: "CLI Management",
     groupSystem: "System",
@@ -1167,6 +1168,24 @@ export const en: Messages = {
     cliNotInstalledGroup: "Not installed",
     cliEdit: "Edit",
     cliDelete: "Delete",
+    codebuddyAccountTitle: "Account Login",
+    codebuddyAccountHint:
+      "Authenticate with Tencent Cloud / WeCom / WeChat account (/login)",
+    codebuddyAccountRefresh: "Refresh Status",
+    codebuddyAccountChecking: "Checking…",
+    codebuddyAccountCheckingDesc: "Reading the OS credential store",
+    codebuddyAccountError: "Status Check Failed",
+    codebuddyAccountErrorDesc: "Could not read the login status; try Refresh Status",
+    codebuddyAccountLoggedIn: "Logged In",
+    codebuddyAccountUnknown: "Status Unknown",
+    codebuddyAccountUnknownDesc:
+      "Could not confirm login state in the OS credential store; if you already ran /login in a terminal, it works as-is",
+    codebuddyAccountReady: "Credentials ready for chat",
+    codebuddyAccountLogin: "Terminal Login",
+    codebuddyAccountRelogin: "Switch Account",
+    codebuddyLoginNoWorkspace:
+      "Open a project first: the login runs in a workspace terminal",
+    codebuddyLoginFailed: "Could not open the login terminal",
     piAuthOauthTitle: "Subscription Authorization",
     piAuthOauthHint:
       "OAuth sign-in with automatic token refresh, stored by the CLI itself",
@@ -2305,6 +2324,9 @@ export const en: Messages = {
       qoder_cn_user: "User settings.json",
       qoder_cn_local: "Workspace settings.local.json",
       qoder_cn_project: "Project .mcp.json (shared)",
+      codebuddy_user: "User mcp.json",
+      codebuddy_local: "Workspace .codebuddy/mcp.json",
+      codebuddy_project: "Project .mcp.json (shared)",
       dsh_profile: "Profile plugin config",
     },
     scope: {
